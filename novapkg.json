@@ -1,0 +1,9 @@
+{
+  "name": "nvo-semver",
+  "version": "1.0.0",
+  "description": "NVO-NovaOfficial: Official semver library",
+  "author": "purcwix",
+  "license": "MIT",
+  "main": "src/main.nv",
+  "dependencies": {}
+}

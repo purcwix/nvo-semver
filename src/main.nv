@@ -1,0 +1,154 @@
+// semver.nv - Semantic Versioning library for Nova
+
+function parseSemver(str) {
+    if str == null { return null; }
+
+    // split build metadata first
+    let buildMeta = "";
+    let plusIdx = str.indexOf("+");
+    if plusIdx != -1 {
+        buildMeta = str.slice(plusIdx + 1);
+        str = str.slice(0, plusIdx);
+    }
+
+    // split pre-release
+    let pre = "";
+    let dashIdx = str.indexOf("-");
+    if dashIdx != -1 {
+        pre = str.slice(dashIdx + 1);
+        str = str.slice(0, dashIdx);
+    }
+
+    // split major.minor.patch
+    let parts = str.split(".");
+    if parts.length != 3 { return null; }
+
+    let major = Std.number(parts[0]);
+    let minor = Std.number(parts[1]);
+    let _patch = Std.number(parts[2]);
+
+    if major != major { return null; } // NaN check
+    if minor != minor { return null; }
+    if _patch != _patch { return null; }
+
+    return {
+        major: major,
+        minor: minor,
+        patch: _patch,
+        pre: pre,
+        build: buildMeta,
+    };
+}
+
+function validSemver(str) {
+    return parseSemver(str) != null;
+}
+
+function compareSemver(a, b) {
+    let pa = parseSemver(a);
+    let pb = parseSemver(b);
+    if pa == null or pb == null { return null; }
+
+    if pa.major != pb.major {
+        return pa.major > pb.major ? 1 : -1;
+    }
+    if pa.minor != pb.minor {
+        return pa.minor > pb.minor ? 1 : -1;
+    }
+    if pa.patch != pb.patch {
+        return pa.patch > pb.patch ? 1 : -1;
+    }
+
+    // both have no pre-release or same pre-release
+    if pa.pre == "" and pb.pre == "" { return 0; }
+    // no pre-release > has pre-release
+    if pa.pre == "" and pb.pre != "" { return 1; }
+    if pa.pre != "" and pb.pre == "" { return -1; }
+    // compare pre-release lexically
+    if pa.pre > pb.pre { return 1; }
+    if pa.pre < pb.pre { return -1; }
+    return 0;
+}
+
+function bumpSemver(str, kind) {
+    let p = parseSemver(str);
+    if p == null { return null; }
+
+    if kind == "major" {
+        return f"{p.major + 1}.0.0";
+    }
+    if kind == "minor" {
+        return f"{p.major}.{p.minor + 1}.0";
+    }
+    if kind == "patch" {
+        return f"{p.major}.{p.minor}.{p.patch + 1}";
+    }
+    return null;
+}
+
+function stringifySemver(p) {
+    if p == null { return null; }
+    let base = f"{p.major}.{p.minor}.{p.patch}";
+    if p.pre != "" { base = base + "-" + p.pre; }
+    if p.build != "" { base = base + "+" + p.build; }
+    return base;
+}
+
+function satisfiesSemver(str, range) {
+    let p = parseSemver(str);
+    if p == null { return false; }
+
+    // strip leading whitespace
+    range = range.trim();
+
+    // caret ^ — compatible with version (same major)
+    if range.startsWith("^") {
+        let rp = parseSemver(range.slice(1));
+        if rp == null { return false; }
+        if p.major != rp.major { return false; }
+        return compareSemver(str, range.slice(1)) >= 0;
+    }
+
+    // tilde ~ — patch level compatible (same major.minor)
+    if range.startsWith("~") {
+        let rp = parseSemver(range.slice(1));
+        if rp == null { return false; }
+        if p.major != rp.major { return false; }
+        if p.minor != rp.minor { return false; }
+        return compareSemver(str, range.slice(1)) >= 0;
+    }
+
+    // >= <= > < =
+    if range.startsWith(">=") {
+        return compareSemver(str, range.slice(2)) >= 0;
+    }
+    if range.startsWith("<=") {
+        return compareSemver(str, range.slice(2)) <= 0;
+    }
+    if range.startsWith(">") {
+        return compareSemver(str, range.slice(1)) > 0;
+    }
+    if range.startsWith("<") {
+        return compareSemver(str, range.slice(1)) < 0;
+    }
+    if range.startsWith("=") {
+        return compareSemver(str, range.slice(1)) == 0;
+    }
+
+    // exact match
+    return compareSemver(str, range) == 0;
+}
+
+let semver = {
+    parse: parseSemver,
+    valid: validSemver,
+    compare: compareSemver,
+    gt(a, b) { return compareSemver(a, b) > 0; },
+    lt(a, b) { return compareSemver(a, b) < 0; },
+    eq(a, b) { return compareSemver(a, b) == 0; },
+    bump: bumpSemver,
+    stringify: stringifySemver,
+    satisfies: satisfiesSemver,
+};
+
+export semver;
